@@ -1,5 +1,4 @@
-"""Script to simulate Go2 Robot in simulation"""
-from dataclasses import MISSING
+"""Script to simulate robots in simulation"""
 
 """Launch the Isaac Sim Simulator First"""
 import argparse
@@ -22,6 +21,8 @@ simulation_app = app_launcher.app
 import torch
 import csv
 import os
+import time
+from dataclasses import MISSING
 from pytorch3d.transforms import quaternion_invert, quaternion_multiply, so3_log_map, quaternion_to_matrix, Rotate, \
     euler_angles_to_matrix, matrix_to_quaternion
 import omni.isaac.lab.envs.mdp as mdp
@@ -48,6 +49,8 @@ from collections.abc import Sequence
 ##
 from isaac_lab_dev.hopper_config import HOPPER_CFG
 
+
+TIME_IT = False
 
 def zero_traj_commands(env: ManagerBasedEnv) -> torch.Tensor:
     """The generated command from the command generator."""
@@ -361,17 +364,24 @@ def main():
     with open('data/output.csv', mode='w', newline='') as file:
         writer = csv.writer(file)
 
-
+        t0 = None
         while simulation_app.is_running():
             with torch.inference_mode():
-                writer.writerow(obs['policy'][0].tolist())
-                print(count)
+                if not TIME_IT:
+                    writer.writerow(obs['policy'][0].tolist())
                 # reset
                 if count % 250 == 0:
                     obs, _ = env.reset()
                     count = 0
                     print("-" * 80)
-                    print("[INFO]: Resetting environment...")
+                    if t0 is not None:
+                        if args_cli.headless:
+                            s = ' (headless)'
+                        else:
+                            s = ' (vis)'
+                        dt = time.perf_counter() - t0
+                        print(f"[INFO]: Resetting environment... {env.num_envs} environment{s}, 250 frames @ 50Hz in {dt:.2f}s: {250 / dt:.2f}fps")
+                    t0 = time.perf_counter()
                 # step env
                 action = raibert_policy(obs["policy"])
 
